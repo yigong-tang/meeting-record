@@ -1,6 +1,5 @@
 """Tests for config module."""
 
-import os
 from meeting_cli.utils.config import get_api_key, get_backend_config
 
 

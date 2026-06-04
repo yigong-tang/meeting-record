@@ -21,18 +21,18 @@ def get_backend_config(backend_name: str) -> dict:
     """Read all environment variables for a named backend.
 
     Backend names normalize to uppercase with underscores:
-        'openai'    -> OPENAI_API_KEY, OPENAI_BASE_URL
-        'aliyun'    -> ALIYUN_ASR_KEY
-        'iflytek'   -> IFLYTEK_ASR_KEY
-        'deepseek'  -> DEEPSEEK_API_KEY
-        'dashscope' -> DASHSCOPE_API_KEY
-        'ollama'    -> OLLAMA_HOST
+        'openai'    → OPENAI_API_KEY, OPENAI_BASE_URL
+        'aliyun'    → ALIYUN_ASR_KEY
+        'iflytek'   → IFLYTEK_ASR_KEY
+        'deepseek'  → DEEPSEEK_API_KEY
+        'dashscope' → DASHSCOPE_API_KEY
+        'ollama'    → OLLAMA_HOST
 
     Args:
         backend_name: Lowercase backend identifier.
 
     Returns:
-        Dict of relevant config keys for that backend.
+        Dict with keys 'api_key' and 'base_url'.
     """
     prefix = backend_name.upper()
     result = {"api_key": None, "base_url": None}
@@ -46,9 +46,5 @@ def get_backend_config(backend_name: str) -> dict:
 
     # Base URL
     result["base_url"] = os.environ.get(f"{prefix}_BASE_URL")
-
-    # Ollama-specific
-    if backend_name == "ollama":
-        result["host"] = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 
     return result
