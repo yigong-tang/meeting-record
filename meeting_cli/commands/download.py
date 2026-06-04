@@ -1,10 +1,29 @@
 """download command: yt-dlp subprocess wrapper."""
 
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import click
+
+# Browser-like User-Agent，B站等平台需要，不影响其他站点
+_DEFAULT_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                  "AppleWebKit/537.36 (KHTML, like Gecko) "
+                  "Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+    "Referer": "https://www.bilibili.com",
+}
+
+
+def _check_ffmpeg():
+    """Check if ffmpeg is available in PATH. Warn if not."""
+    if shutil.which("ffmpeg") is None:
+        click.echo(
+            "警告: 未找到 ffmpeg。部分视频的音视频流将无法自动合并。\n"
+            "  安装: winget install ffmpeg (Windows) 或 apt install ffmpeg (Linux)",
+            err=True,
+        )
 
 
 def build_yt_dlp_args(
@@ -33,6 +52,10 @@ def build_yt_dlp_args(
         "yt-dlp",
         "-o", str(out_dir / "%(title)s.%(ext)s"),
     ]
+
+    # 默认浏览器 User-Agent（B站等平台需要）
+    for header, value in _DEFAULT_HEADERS.items():
+        args.extend(["--add-header", f"{header}:{value}"])
 
     if audio_only:
         args.extend(["-x", "--audio-format", "mp3"])
@@ -87,6 +110,12 @@ def download(
     """从视频网站下载会议音频/视频。
 
     URL 可以是 B站、YouTube 等 yt-dlp 支持的任意平台。
+
+    \b
+    示例:
+      meeting-cli download BV1xx -o my-meeting
+      meeting-cli download BV1xx --no-audio-only --keep-video -o my-meeting
+      meeting-cli download BV1xx --cookies cookies.txt
     """
     args = build_yt_dlp_args(
         url=url,
@@ -99,6 +128,8 @@ def download(
     if dry_run:
         click.echo(" ".join(args))
         return
+
+    _check_ffmpeg()
 
     click.echo(f"正在下载: {url}")
     click.echo(f"输出目录: {output_dir}")

@@ -1,5 +1,7 @@
 """Tests for download command."""
 
+import pytest
+from unittest import mock
 from meeting_cli.commands.download import build_yt_dlp_args
 
 
@@ -36,10 +38,9 @@ class TestBuildYtDlpArgs:
         )
         output_arg_idx = args.index("-o")
         output_path = args[output_arg_idx + 1]
-        # Normalise path separators for cross-platform (Windows vs Unix)
         assert output_path.replace("\\", "/").startswith("/tmp/meetings")
 
-    def test_bilibili_cookies_flag(self):
+    def test_cookies_flag(self):
         args = build_yt_dlp_args(
             url="https://www.bilibili.com/video/BV1xx",
             output_dir="/tmp/out",
@@ -50,3 +51,26 @@ class TestBuildYtDlpArgs:
         assert "--cookies" in args
         cookie_idx = args.index("--cookies")
         assert args[cookie_idx + 1] == "/path/to/cookies.txt"
+
+    def test_default_user_agent_header(self):
+        """User-Agent should always be included."""
+        args = build_yt_dlp_args(
+            url="https://example.com/video",
+            output_dir="/tmp/out",
+        )
+        assert "--add-header" in args
+        header_idx = args.index("--add-header")
+        assert "User-Agent" in args[header_idx + 1]
+
+    def test_referer_header(self):
+        """Referer should always be included."""
+        args = build_yt_dlp_args(
+            url="https://example.com/video",
+            output_dir="/tmp/out",
+        )
+        # Find all --add-header values
+        headers = [
+            args[i + 1] for i, a in enumerate(args)
+            if a == "--add-header"
+        ]
+        assert any("Referer" in h for h in headers)

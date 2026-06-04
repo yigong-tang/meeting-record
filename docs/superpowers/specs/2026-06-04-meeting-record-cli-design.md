@@ -90,7 +90,10 @@ meeting-record/
 - 通过 subprocess 调用 yt-dlp 命令行工具（需用户自行安装 yt-dlp）
 - 默认 `--audio-only`，提取音频为 mp3
 - `--keep-video` 时保留原始视频文件
-- 产出：`<output-dir>/audio.mp3`，可选 `<output-dir>/video.mp4`
+- 默认携带浏览器 User-Agent 和 Referer header（B站等平台需要）
+- `--cookies` 指定 Netscape 格式的 cookie 文件路径（B站登录态）
+- 下载前检查 ffmpeg 是否可用，不可用时给出警告提示（音视频流可能无法自动合并）
+- 产出：`<output-dir>/<title>.mp3`，可选 `<output-dir>/<title>.mp4`
 
 ### 2. transcribe — 转写调度
 
