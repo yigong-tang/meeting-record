@@ -37,11 +37,12 @@ class TestGetBackendConfig:
 
 
 class TestGetModelDir:
-    def test_returns_default_path(self, monkeypatch):
+    def test_default_is_under_project_root(self, monkeypatch):
+        """Default path should be <project>/.meeting-cli/models."""
         monkeypatch.delenv("MEETING_CLI_MODEL_DIR", raising=False)
         path = get_model_dir()
         assert path.name == "models"
-        assert ".config" in str(path)
+        assert ".meeting-cli" in str(path)
 
     def test_uses_env_var(self, monkeypatch, tmp_path):
         monkeypatch.setenv("MEETING_CLI_MODEL_DIR", str(tmp_path / "my-models"))

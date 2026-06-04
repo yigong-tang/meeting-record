@@ -51,16 +51,27 @@ def get_backend_config(backend_name: str) -> dict:
     return result
 
 
+def _find_project_root() -> Path:
+    """Walk up from this file to find the project root (contains pyproject.toml)."""
+    current = Path(__file__).resolve().parent
+    for parent in [current] + list(current.parents):
+        if (parent / "pyproject.toml").exists():
+            return parent
+    # Fallback: use current working directory
+    return Path.cwd()
+
+
 def get_model_dir() -> Path:
     """Return the local model storage directory.
 
     Controlled by MEETING_CLI_MODEL_DIR env var.
-    Default: ~/.config/meeting-cli/models
+    Default: <project-root>/.meeting-cli/models
+    (so the whole project folder can be copied to another machine).
 
     Returns:
         Path to the model directory (created if it doesn't exist).
     """
-    default = Path.home() / ".config" / "meeting-cli" / "models"
+    default = _find_project_root() / ".meeting-cli" / "models"
     path = Path(os.environ.get("MEETING_CLI_MODEL_DIR", str(default)))
     path.mkdir(parents=True, exist_ok=True)
     return path

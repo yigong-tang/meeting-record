@@ -13,11 +13,16 @@ venv/
 .vscode/
 .idea/
 
+# Meeting-cli local data
+.meeting-cli/
+
 # Superpowers
 .superpowers/
 
-# Output
+# Output (downloaded videos, transcripts, etc.)
 meeting-output/
+dabing-job-chioce/
+mengyan-fisrt-class/
 
 # OS
 .DS_Store
