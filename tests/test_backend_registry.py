@@ -139,7 +139,7 @@ class TestSummarizerRegistry:
         s2 = get_summarizer("openai")
         assert s1 is not s2
 
-    def test_summarizer_raises_not_implemented(self):
+    def test_summarizer_no_api_key_exits(self):
         summarizer = get_summarizer("openai")
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(SystemExit):
             summarizer.summarize("test transcript")
