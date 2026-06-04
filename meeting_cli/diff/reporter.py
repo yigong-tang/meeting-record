@@ -1,16 +1,15 @@
 """Diff report generation: HTML report and final merged transcript."""
 
+from meeting_cli.commands.transcribe import format_timestamp
 from meeting_cli.diff.engine import DiffResult, DiffLevel
 
 
-def format_ts(seconds: float | None) -> str:
-    """Format seconds to HH:MM:SS."""
+def _ts(seconds: float | None) -> str:
+    """Format seconds using the canonical timestamp format.
+    Returns placeholder if None."""
     if seconds is None:
         return "--:--:--"
-    h = int(seconds // 3600)
-    m = int((seconds % 3600) // 60)
-    s = int(seconds % 60)
-    return f"{h:02d}:{m:02d}:{s:02d}"
+    return format_timestamp(seconds)
 
 
 LEVEL_LABELS = {
@@ -48,9 +47,9 @@ def build_html_report(
         rows_html += f"""
         <tr class="diff-{r.level.value}">
             <td class="idx">{r.segment_index + 1}</td>
-            <td class="ts">[{format_ts(r.start_a)} -> {format_ts(r.end_a)}]</td>
+            <td class="ts">[{_ts(r.start_a)} -> {_ts(r.end_a)}]</td>
             <td class="text">{r.text_a}</td>
-            <td class="ts">[{format_ts(r.start_b)} -> {format_ts(r.end_b)}]</td>
+            <td class="ts">[{_ts(r.start_b)} -> {_ts(r.end_b)}]</td>
             <td class="text">{r.text_b}</td>
             <td class="level">{level_label}</td>
             <td class="choice">{choice_display}</td>
@@ -143,7 +142,7 @@ def build_final_transcript(results: list[DiffResult]) -> str:
 
         if text and start is not None and end is not None:
             lines.append(
-                f"[{format_ts(start)} -> {format_ts(end)}] {text}"
+                f"[{_ts(start)} -> {_ts(end)}] {text}"
             )
 
     return "\n".join(lines)

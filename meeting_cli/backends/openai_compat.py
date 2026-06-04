@@ -12,6 +12,13 @@ from meeting_cli.backends.summarizer import BaseSummarizer
 from meeting_cli.utils.config import get_backend_config
 
 
+# Known provider base URLs (when user doesn't set {PREFIX}_BASE_URL)
+_DEFAULT_BASE_URLS = {
+    "deepseek": "https://api.deepseek.com",
+    "dashscope": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+}
+
+
 SUMMARY_SYSTEM_PROMPT = """你是一个专业的会议纪要助手。请根据以下会议转写记录生成结构化的会议纪要。
 
 要求：
@@ -65,7 +72,8 @@ class OpenAICompatSummarizer(BaseSummarizer):
         self.backend_name = backend_name
         config = get_backend_config(backend_name)
         self.api_key = config["api_key"]
-        self.base_url = config["base_url"]
+        self.base_url = config["base_url"] or _DEFAULT_BASE_URLS.get(backend_name)
+        self.model = config["model"] or "deepseek-v4-flash"
 
     def summarize(self, transcript: str) -> str:
         """Summarize a transcript using the configured LLM backend.
@@ -99,7 +107,7 @@ class OpenAICompatSummarizer(BaseSummarizer):
         client = OpenAI(**client_kwargs)
 
         response = client.chat.completions.create(
-            model="gpt-4o-mini",  # 默认轻量模型，可通过环境变量覆盖
+            model=self.model,
             messages=[
                 {"role": "system", "content": SUMMARY_SYSTEM_PROMPT},
                 {"role": "user", "content": _build_summary_prompt(transcript)},
@@ -107,3 +115,21 @@ class OpenAICompatSummarizer(BaseSummarizer):
             temperature=0.3,
         )
         return response.choices[0].message.content or ""
+
+
+class DeepSeekSummarizer(OpenAICompatSummarizer):
+    """DeepSeek API summarizer. Requires DEEPSEEK_API_KEY env var."""
+
+    name = "deepseek"
+
+    def __init__(self):
+        super().__init__(backend_name="deepseek")
+
+
+class DashScopeSummarizer(OpenAICompatSummarizer):
+    """Alibaba DashScope (Qwen) summarizer. Requires DASHSCOPE_API_KEY env var."""
+
+    name = "dashscope"
+
+    def __init__(self):
+        super().__init__(backend_name="dashscope")

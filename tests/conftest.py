@@ -3,6 +3,7 @@
 import tempfile
 from pathlib import Path
 import pytest
+from meeting_cli.commands.transcribe import format_timestamp
 
 
 @pytest.fixture
@@ -33,11 +34,3 @@ def sample_transcript_path(temp_output_dir, sample_transcript):
         lines.append(f"[{start_ts} -> {end_ts}] {seg['text']}")
     path.write_text("\n".join(lines), encoding="utf-8")
     return path
-
-
-def format_timestamp(seconds: float) -> str:
-    """Convert float seconds to HH:MM:SS.mmm format."""
-    h = int(seconds // 3600)
-    m = int((seconds % 3600) // 60)
-    s = seconds % 60
-    return f"{h:02d}:{m:02d}:{s:06.3f}"

@@ -36,7 +36,7 @@ def get_backend_config(backend_name: str) -> dict:
         Dict with keys 'api_key' and 'base_url'.
     """
     prefix = backend_name.upper()
-    result = {"api_key": None, "base_url": None}
+    result = {"api_key": None, "base_url": None, "model": None}
 
     # API key: try {PREFIX}_API_KEY, then {PREFIX}_ASR_KEY
     for key_suffix in ["API_KEY", "ASR_KEY"]:
@@ -47,6 +47,9 @@ def get_backend_config(backend_name: str) -> dict:
 
     # Base URL
     result["base_url"] = os.environ.get(f"{prefix}_BASE_URL")
+
+    # Model name
+    result["model"] = os.environ.get(f"{prefix}_MODEL")
 
     return result
 

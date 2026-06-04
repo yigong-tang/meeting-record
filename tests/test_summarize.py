@@ -2,6 +2,37 @@
 
 import pytest
 from meeting_cli.backends.openai_compat import OpenAICompatSummarizer, _build_summary_prompt
+from meeting_cli.commands.summarize import strip_timestamps
+
+
+class TestStripTimestamps:
+    def test_removes_timestamp_line_prefix(self):
+        text = (
+            "[00:00:00.000 -> 00:00:03.500] 大家好\n"
+            "[00:00:03.500 -> 00:00:08.200] 欢迎参会\n"
+        )
+        result = strip_timestamps(text)
+        assert "大家好" in result
+        assert "欢迎参会" in result
+        assert "[00:00" not in result
+
+    def test_collapses_multiple_blank_lines(self):
+        text = (
+            "[00:00:00.000 -> 00:00:03.500] 第一句\n\n\n\n"
+            "[00:00:03.500 -> 00:00:08.200] 第二句\n"
+        )
+        result = strip_timestamps(text)
+        # Should not have 3+ consecutive newlines
+        assert "\n\n\n" not in result
+
+    def test_preserves_text_content(self):
+        text = "[00:01:00.000 -> 00:01:05.000] Q2预算上调15%\n"
+        result = strip_timestamps(text)
+        assert "Q2预算上调15%" in result
+
+    def test_handles_empty_input(self):
+        result = strip_timestamps("")
+        assert result == ""
 
 
 class TestSummarizeCommand:

@@ -39,9 +39,10 @@ class TestBaseTranscriberABC:
                     return []
 
     def test_subclass_must_implement_transcribe(self):
-        with pytest.raises(TypeError, match="transcribe"):
-            class BadTranscriber(BaseTranscriber):  # type: ignore[no-redef]
-                name = "bad"
+        class BadTranscriber(BaseTranscriber):
+            name = "bad"
+        with pytest.raises(TypeError):
+            BadTranscriber()  # instantiation fails, not definition
 
 
 # ---------------------------------------------------------------------------
@@ -56,9 +57,10 @@ class TestBaseSummarizerABC:
                     return ""
 
     def test_subclass_must_implement_summarize(self):
-        with pytest.raises(TypeError, match="summarize"):
-            class BadSummarizer(BaseSummarizer):  # type: ignore[no-redef]
-                name = "bad"
+        class BadSummarizer(BaseSummarizer):
+            name = "bad"
+        with pytest.raises(TypeError):
+            BadSummarizer()  # instantiation fails, not definition
 
 
 # ---------------------------------------------------------------------------

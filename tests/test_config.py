@@ -23,10 +23,9 @@ class TestGetBackendConfig:
         monkeypatch.setenv("OPENAI_API_KEY", "sk-openai")
         monkeypatch.setenv("OPENAI_BASE_URL", "https://proxy.example.com/v1")
         config = get_backend_config("openai")
-        assert config == {
-            "api_key": "sk-openai",
-            "base_url": "https://proxy.example.com/v1",
-        }
+        assert config["api_key"] == "sk-openai"
+        assert config["base_url"] == "https://proxy.example.com/v1"
+        assert config["model"] is None
 
     def test_handles_missing_vars(self, monkeypatch):
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
