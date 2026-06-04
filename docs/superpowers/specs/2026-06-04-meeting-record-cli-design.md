@@ -14,6 +14,7 @@
 | 管道模式 | 线性手动管道（方案 A），每步独立运行 |
 | 后端机制 | 可插拔，统一注册表，新增后端无需改 CLI 层 |
 | 配置管理 | 环境变量 |
+| 模型存储 | `~/.config/meeting-cli/models/`，可通过 `MEETING_CLI_MODEL_DIR` 覆盖 |
 | 视频来源 | B站为主，通过 yt-dlp |
 | 转写时间戳 | 强制要求，作为 diff 对齐和字幕生成的基础 |
 
@@ -195,6 +196,7 @@ class BaseSummarizer:
 | `OPENAI_API_KEY` | OpenAI API（Whisper + LLM） |
 | `DEEPSEEK_API_KEY` | DeepSeek LLM |
 | `DASHSCOPE_API_KEY` | 通义千问 LLM |
+| `MEETING_CLI_MODEL_DIR` | 本地模型存储目录（默认 `~/.config/meeting-cli/models`） |
 | `OLLAMA_HOST` | 本地 Ollama 地址 |
 
 ## 数据流总览

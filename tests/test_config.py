@@ -1,6 +1,7 @@
 """Tests for config module."""
 
-from meeting_cli.utils.config import get_api_key, get_backend_config
+from pathlib import Path
+from meeting_cli.utils.config import get_api_key, get_backend_config, get_model_dir
 
 
 class TestGetApiKey:
@@ -33,3 +34,23 @@ class TestGetBackendConfig:
         config = get_backend_config("openai")
         assert config["api_key"] is None
         assert config["base_url"] is None
+
+
+class TestGetModelDir:
+    def test_returns_default_path(self, monkeypatch):
+        monkeypatch.delenv("MEETING_CLI_MODEL_DIR", raising=False)
+        path = get_model_dir()
+        assert path.name == "models"
+        assert ".config" in str(path)
+
+    def test_uses_env_var(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("MEETING_CLI_MODEL_DIR", str(tmp_path / "my-models"))
+        path = get_model_dir()
+        assert path.name == "my-models"
+
+    def test_creates_dir_if_missing(self, monkeypatch, tmp_path):
+        new_dir = tmp_path / "new-models"
+        monkeypatch.setenv("MEETING_CLI_MODEL_DIR", str(new_dir))
+        path = get_model_dir()
+        assert path.exists()
+        assert path.is_dir()

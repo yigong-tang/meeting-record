@@ -1,6 +1,7 @@
 """Environment variable configuration reader."""
 
 import os
+from pathlib import Path
 from typing import Optional
 
 
@@ -48,3 +49,18 @@ def get_backend_config(backend_name: str) -> dict:
     result["base_url"] = os.environ.get(f"{prefix}_BASE_URL")
 
     return result
+
+
+def get_model_dir() -> Path:
+    """Return the local model storage directory.
+
+    Controlled by MEETING_CLI_MODEL_DIR env var.
+    Default: ~/.config/meeting-cli/models
+
+    Returns:
+        Path to the model directory (created if it doesn't exist).
+    """
+    default = Path.home() / ".config" / "meeting-cli" / "models"
+    path = Path(os.environ.get("MEETING_CLI_MODEL_DIR", str(default)))
+    path.mkdir(parents=True, exist_ok=True)
+    return path
