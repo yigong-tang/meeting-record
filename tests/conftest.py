@@ -1,6 +1,5 @@
 """pytest fixtures for meeting-cli."""
 
-import os
 import tempfile
 from pathlib import Path
 import pytest
