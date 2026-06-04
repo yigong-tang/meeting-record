@@ -104,10 +104,15 @@ class TestTranscriberRegistry:
         t2 = get_transcriber("whisper")
         assert t1 is not t2
 
-    def test_transcriber_raises_not_implemented(self):
+    def test_transcriber_can_be_instantiated(self):
+        """WhisperLocalTranscriber can be instantiated and has expected attributes."""
+        from meeting_cli.backends.whisper_local import WhisperLocalTranscriber
+
         transcriber = get_transcriber("whisper")
-        with pytest.raises(NotImplementedError):
-            transcriber.transcribe("dummy.wav")
+        assert isinstance(transcriber, WhisperLocalTranscriber)
+        assert transcriber.name == "whisper"
+        assert transcriber.model_size == "medium"
+        assert transcriber.device == "auto"
 
 
 # ---------------------------------------------------------------------------
