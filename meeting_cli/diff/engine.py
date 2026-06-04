@@ -1,4 +1,4 @@
-"""Diff engine: timestamp-based alignment and difference grading."""
+"""Diff engine: text-content-based alignment and difference grading."""
 
 from dataclasses import dataclass, field
 from enum import Enum
@@ -31,99 +31,149 @@ class DiffResult:
 def align_segments(
     segs_a: list[Segment],
     segs_b: list[Segment],
-    timestamp_threshold: float = 2.0,
 ) -> list[DiffResult]:
-    """Align two timestamped transcript segment lists.
+    """Align two transcript segment lists by text content.
 
-    Primary alignment key: timestamp overlap.
-    Secondary key: text similarity for near-miss timestamps.
+    Instead of relying on timestamps (which differ between models),
+    this concatentes all text from each side and uses
+    SequenceMatcher to find matching / differing blocks,
+    then maps those blocks back to the original segments.
 
     Args:
         segs_a: Segments from transcript A.
         segs_b: Segments from transcript B.
-        timestamp_threshold: Max time offset (seconds) to consider
-            two segments as potentially the same utterance.
 
     Returns:
-        List of DiffResult objects, one per aligned/matched pair.
+        List of DiffResult objects.
     """
-    results: list[DiffResult] = []
-    used_b: set[int] = set()
-    used_a: set[int] = set()
+    # 1. Build full texts and position-to-segment maps
+    full_a, a_spans = _build_text_and_spans(segs_a)
+    full_b, b_spans = _build_text_and_spans(segs_b)
 
-    # Pass 1: timestamp overlap matching
-    for i, seg_a in enumerate(segs_a):
-        best_j: int | None = None
-        best_overlap = 0.0
-        for j, seg_b in enumerate(segs_b):
-            if j in used_b:
-                continue
-            overlap = _overlap_duration(seg_a, seg_b)
-            if overlap > best_overlap:
-                best_overlap = overlap
-                best_j = j
+    # 2. Run SequenceMatcher on full texts
+    matcher = SequenceMatcher(None, full_a, full_b)
+    opcodes = matcher.get_opcodes()
 
-        if best_j is not None and best_overlap > 0:
-            seg_b = segs_b[best_j]
-            used_a.add(i)
-            used_b.add(best_j)
-            results.append(DiffResult(
-                level=grade_difference(seg_a.text, seg_b.text),
-                start_a=seg_a.start,
-                end_a=seg_a.end,
-                text_a=seg_a.text,
-                start_b=seg_b.start,
-                end_b=seg_b.end,
-                text_b=seg_b.text,
-                segment_index=len(results),
-            ))
+    # 3. Create raw DiffResults from opcodes
+    raw_results: list[DiffResult] = []
 
-    # Pass 2: timestamp-adjacent + similarity match for near-misses
-    for i, seg_a in enumerate(segs_a):
-        if i in used_a:
+    for tag, a1, a2, b1, b2 in opcodes:
+        seg_indices_a = _spans_in_range(a_spans, a1, a2)
+        seg_indices_b = _spans_in_range(b_spans, b1, b2)
+
+        text_a = full_a[a1:a2]
+        text_b = full_b[b1:b2]
+
+        start_a = segs_a[seg_indices_a[0]].start if seg_indices_a else None
+        end_a = segs_a[seg_indices_a[-1]].end if seg_indices_a else None
+        start_b = segs_b[seg_indices_b[0]].start if seg_indices_b else None
+        end_b = segs_b[seg_indices_b[-1]].end if seg_indices_b else None
+
+        if tag == "equal":
+            level = DiffLevel.SAME
+        elif tag == "delete":
+            level = DiffLevel.ORPHAN
+        elif tag == "insert":
+            level = DiffLevel.ORPHAN
+        else:  # replace
+            level = grade_difference(text_a, text_b)
+
+        # Skip empty fragments
+        if not text_a and not text_b:
             continue
-        for j, seg_b in enumerate(segs_b):
-            if j in used_b:
-                continue
-            time_diff = abs(seg_a.start - seg_b.start)
-            if time_diff <= timestamp_threshold and _similarity(seg_a.text, seg_b.text) > 0.5:
-                used_a.add(i)
-                used_b.add(j)
-                results.append(DiffResult(
-                    level=grade_difference(seg_a.text, seg_b.text),
-                    start_a=seg_a.start,
-                    end_a=seg_a.end,
-                    text_a=seg_a.text,
-                    start_b=seg_b.start,
-                    end_b=seg_b.end,
-                    text_b=seg_b.text,
-                    segment_index=len(results),
-                ))
-                break
 
-    # Pass 3: orphan segments from side A
-    for i, seg_a in enumerate(segs_a):
-        if i not in used_a:
-            results.append(DiffResult(
-                level=DiffLevel.ORPHAN,
-                start_a=seg_a.start,
-                end_a=seg_a.end,
-                text_a=seg_a.text,
-                segment_index=len(results),
-            ))
+        raw_results.append(DiffResult(
+            level=level,
+            start_a=start_a, end_a=end_a, text_a=text_a,
+            start_b=start_b, end_b=end_b, text_b=text_b,
+            segment_index=len(raw_results),
+        ))
 
-    # Pass 4: orphan segments from side B
-    for j, seg_b in enumerate(segs_b):
-        if j not in used_b:
-            results.append(DiffResult(
-                level=DiffLevel.ORPHAN,
-                start_b=seg_b.start,
-                end_b=seg_b.end,
-                text_b=seg_b.text,
-                segment_index=len(results),
-            ))
+    # 4. Merge adjacent same-level fragments to reduce noise
+    return _merge_adjacent(raw_results)
 
-    return results
+
+def _build_text_and_spans(segs: list[Segment]) -> tuple[str, list[tuple[int, int]]]:
+    """Build concatenated text and a list of (start_char, end_char) spans per segment."""
+    text = ""
+    spans = []
+    for seg in segs:
+        spans.append((len(text), len(text) + len(seg.text)))
+        text += seg.text
+    return text, spans
+
+
+def _spans_in_range(spans: list[tuple[int, int]], start: int, end: int) -> list[int]:
+    """Return indices of spans that overlap with [start, end)."""
+    indices = []
+    for i, (s, e) in enumerate(spans):
+        if s < end and e > start:
+            indices.append(i)
+    return indices
+
+
+def _merge_adjacent(results: list[DiffResult]) -> list[DiffResult]:
+    """Merge adjacent DiffResults to produce cleaner segment-level output.
+
+    Character-level diffs alternate between tiny SAME/DIFF fragments
+    (e.g. "会"(SAME) → "议"(ORPHAN) → "今天"(SAME)).
+    We merge small alternations into larger blocks.
+    """
+    if not results:
+        return []
+
+    # Group into runs: merge consecutive fragments where at least
+    # one side's text is short (< 10 chars) into the surrounding context.
+    merged: list[DiffResult] = []
+    i = 0
+    while i < len(results):
+        r = results[i]
+        # If this fragment is tiny on both sides, merge with the next one
+        if len(r.text_a) < 5 and len(r.text_b) < 5 and i + 1 < len(results):
+            next_r = results[i + 1]
+            r = DiffResult(
+                level=_worse_level(r.level, next_r.level),
+                start_a=r.start_a or next_r.start_a,
+                end_a=next_r.end_a or r.end_a,
+                text_a=r.text_a + next_r.text_a,
+                start_b=r.start_b or next_r.start_b,
+                end_b=next_r.end_b or r.end_b,
+                text_b=r.text_b + next_r.text_b,
+                segment_index=r.segment_index,
+            )
+            i += 1
+
+        merged.append(r)
+        i += 1
+
+    # Second pass: merge adjacent same-level fragments
+    if not merged:
+        return []
+
+    final: list[DiffResult] = []
+    current = merged[0]
+    for next_r in merged[1:]:
+        if current.level == next_r.level:
+            current.text_a += next_r.text_a
+            current.text_b += next_r.text_b
+            current.end_a = next_r.end_a or current.end_a
+            current.end_b = next_r.end_b or current.end_b
+        else:
+            final.append(current)
+            current = next_r
+    final.append(current)
+
+    # Re-index
+    for idx, r in enumerate(final):
+        r.segment_index = idx
+
+    return final
+
+
+def _worse_level(a: DiffLevel, b: DiffLevel) -> DiffLevel:
+    """Return the more severe of two diff levels."""
+    order = {DiffLevel.SAME: 0, DiffLevel.SMALL: 1, DiffLevel.LARGE: 2, DiffLevel.ORPHAN: 3}
+    return a if order[a] >= order[b] else b
 
 
 def grade_difference(text_a: str, text_b: str) -> DiffLevel:

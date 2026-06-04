@@ -82,11 +82,17 @@ def parse_timestamp(ts: str) -> float:
     show_default=True,
     help="音频语言提示",
 )
+@click.option(
+    "--model-size", "-m",
+    default=None,
+    help="模型大小（whisper 后端可用: tiny, small, medium, large-v3）",
+)
 def transcribe(
     file: str,
     backend: tuple[str, ...],
     output_dir: str,
     language: str,
+    model_size: str | None,
 ):
     """将音频文件转写为带时间戳的文本记录。
 
@@ -113,8 +119,16 @@ def transcribe(
             )
             sys.exit(1)
 
+        # 如果后端支持 model_size，传入用户选择的值
+        if model_size and hasattr(transcriber, "model_size"):
+            transcriber.model_size = model_size
+
         segments = transcriber.transcribe(str(audio_path))
-        out_path = out_dir / f"trans-{be_name}.txt"
+
+        # 文件名包含后端名和模型大小，避免不同模型互相覆盖
+        size = getattr(transcriber, "model_size", "")
+        suffix = f"-{size}" if size else ""
+        out_path = out_dir / f"trans-{be_name}{suffix}.txt"
 
         lines = [format_segment_line(seg) for seg in segments]
         out_path.write_text("\n".join(lines), encoding="utf-8")

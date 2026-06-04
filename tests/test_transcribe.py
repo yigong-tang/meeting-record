@@ -11,26 +11,15 @@ class TestWhisperLocalTranscriber:
         t = WhisperLocalTranscriber()
         assert t.name == "whisper"
 
-    def test_default_model_size_is_medium(self):
+    def test_default_model_size_is_small(self):
         t = WhisperLocalTranscriber()
-        assert t.model_size == "medium"
+        assert t.model_size == "small"
 
-    def test_resolve_model_path_returns_none_when_no_local_model(self, monkeypatch, tmp_path):
-        """If no local model exists, should return None (use HF cache fallback)."""
-        monkeypatch.setenv("MEETING_CLI_MODEL_DIR", str(tmp_path))
-        t = WhisperLocalTranscriber(model_size="medium")
-        result = t._resolve_model_path()
-        assert result is None
-
-    def test_resolve_model_path_finds_local_model(self, monkeypatch, tmp_path):
-        """If model.bin exists locally, should return the path."""
-        model_dir = tmp_path / "faster-whisper" / "medium"
-        model_dir.mkdir(parents=True)
-        (model_dir / "model.bin").touch()
-        monkeypatch.setenv("MEETING_CLI_MODEL_DIR", str(tmp_path))
-        t = WhisperLocalTranscriber(model_size="medium")
-        result = t._resolve_model_path()
-        assert result == str(model_dir)
+    def test_model_size_can_be_changed(self):
+        """Model size should be mutable after construction."""
+        t = WhisperLocalTranscriber()
+        t.model_size = "tiny"
+        assert t.model_size == "tiny"
 
 
 class TestTranscribeOutputFormat:

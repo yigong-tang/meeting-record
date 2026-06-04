@@ -111,7 +111,7 @@ class TestTranscriberRegistry:
         transcriber = get_transcriber("whisper")
         assert isinstance(transcriber, WhisperLocalTranscriber)
         assert transcriber.name == "whisper"
-        assert transcriber.model_size == "medium"
+        assert transcriber.model_size == "small"
         assert transcriber.device == "auto"
 
 

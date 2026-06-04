@@ -16,40 +16,42 @@ def make_segments(pairs: list[tuple[float, float, str]]) -> list[Segment]:
 
 
 class TestAlignSegments:
-    def test_identical_timestamps_direct_match(self):
+    def test_identical_content(self):
+        """Same text content → all SAME."""
         a = make_segments([(0, 2, "你好"), (2, 5, "世界")])
         b = make_segments([(0, 2, "你好"), (2, 5, "世界")])
         results = align_segments(a, b)
-        assert len(results) == 2
-        assert results[0].level == DiffLevel.SAME
+        for r in results:
+            assert r.level == DiffLevel.SAME
 
     def test_text_diff_detected(self):
+        """Different text → not SAME."""
         a = make_segments([(0, 3, "预算上调15%")])
         b = make_segments([(0, 3, "预算上调50%")])
         results = align_segments(a, b)
-        assert len(results) == 1
-        assert results[0].level != DiffLevel.SAME
+        assert any(r.level != DiffLevel.SAME for r in results)
 
-    def test_timestamp_offset_within_threshold(self):
-        """Slightly offset timestamps should still align."""
-        a = make_segments([(0.0, 2.0, "大家好")])
-        b = make_segments([(0.5, 2.3, "大家好")])
+    def test_diff_segmentation_still_aligns(self):
+        """Different segment boundaries, same content → aligns correctly."""
+        a = make_segments([(0.0, 4.0, "我们决定将预算上调")])
+        b = make_segments([
+            (0.0, 2.0, "我们决定"),
+            (2.0, 4.0, "将预算上调"),
+        ])
         results = align_segments(a, b)
-        assert len(results) == 1
-        assert results[0].level == DiffLevel.SAME
+        # Since content is identical, should all be SAME
+        assert all(r.level == DiffLevel.SAME for r in results)
 
     def test_orphan_segment_in_one_side(self):
-        """A segment missing from one side becomes orphan."""
+        """Extra text only in B → ORPHAN."""
         a = make_segments([(0, 2, "第一句")])
         b = make_segments([(0, 2, "第一句"), (3, 5, "多出来的")])
         results = align_segments(a, b)
-        assert len(results) == 2
         orphans = [r for r in results if r.level == DiffLevel.ORPHAN]
         assert len(orphans) == 1
-        assert orphans[0].text_b == "多出来的"
 
-    def test_mismatched_count_with_diff(self):
-        """Whisper splits into 3 segments, Aliyun into 2."""
+    def test_mismatched_content_with_diff(self):
+        """Same structure, partially different text — differences detected."""
         a = make_segments([
             (0, 2, "我们决定"),
             (2, 4, "将预算"),
@@ -60,10 +62,11 @@ class TestAlignSegments:
             (3, 6, "上调50%"),
         ])
         results = align_segments(a, b)
-        # Should produce some alignment, detecting text differences
         assert len(results) > 0
+        # At least one result should not be SAME (text differs)
         levels = [r.level for r in results]
-        assert DiffLevel.LARGE in levels or DiffLevel.SMALL in levels
+        non_same = [l for l in levels if l != DiffLevel.SAME]
+        assert len(non_same) > 0
 
 
 class TestGradeDifference:

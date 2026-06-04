@@ -30,6 +30,7 @@ meeting-cli transcribe <file>       转写音频
     --backend <name>                选择后端（可多次指定）
     --output-dir <dir>              工作目录
     --language zh                   语言提示
+    --model-size <size>             模型大小（whisper: tiny/small/medium/large-v3）
 
 meeting-cli compare <a> <b>         对比两份转写
     --output-dir <dir>
