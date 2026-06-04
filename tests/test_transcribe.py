@@ -11,9 +11,9 @@ class TestWhisperLocalTranscriber:
         t = WhisperLocalTranscriber()
         assert t.name == "whisper"
 
-    def test_default_model_size_is_small(self):
+    def test_default_model_size_is_medium(self):
         t = WhisperLocalTranscriber()
-        assert t.model_size == "small"
+        assert t.model_size == "medium"
 
     def test_model_size_can_be_changed(self):
         """Model size should be mutable after construction."""

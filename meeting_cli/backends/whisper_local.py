@@ -17,7 +17,7 @@ class WhisperLocalTranscriber(BaseTranscriber):
 
     name = "whisper"
 
-    def __init__(self, model_size: str = "small", device: str = "auto"):
+    def __init__(self, model_size: str = "medium", device: str = "auto"):
         self.model_size = model_size
         self.device = device
 
