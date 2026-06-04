@@ -84,7 +84,7 @@ class TestCLIBasics:
 
 class TestComparePipeline:
     def test_compare_with_sample_files(self, runner, tmp_path, sample_transcript_a, sample_transcript_b):
-        """End-to-end compare pipeline with sample files."""
+        """Default auto-decide: no interactive input needed."""
         out_dir = tmp_path / "output"
         result = runner.invoke(
             cli,
@@ -94,16 +94,31 @@ class TestComparePipeline:
                 str(sample_transcript_b),
                 "-o", str(out_dir),
             ],
-            input="a\na\n",  # choose A for all diff segments
         )
         assert result.exit_code == 0
-        # Verify output files exist
         final_path = out_dir / "final-transcript.txt"
         assert final_path.exists()
         report_path = out_dir / "diff-report.html"
         assert report_path.exists()
         content = final_path.read_text(encoding="utf-8")
         assert "大家好欢迎" in content
+
+    def test_compare_interactive_mode(self, runner, tmp_path, sample_transcript_a, sample_transcript_b):
+        """--interactive mode with simulated user input."""
+        out_dir = tmp_path / "output"
+        result = runner.invoke(
+            cli,
+            [
+                "compare",
+                str(sample_transcript_a),
+                str(sample_transcript_b),
+                "-o", str(out_dir),
+                "--interactive",
+            ],
+            input="a\na\n",
+        )
+        assert result.exit_code == 0
+        assert (out_dir / "final-transcript.txt").exists()
 
     def test_compare_no_differences(self, runner, tmp_path, sample_transcript_a):
         """Compare a file against itself — should report 'no differences'."""
@@ -137,7 +152,7 @@ class TestComparePipeline:
         assert result.exit_code != 0
 
     def test_compare_outputs_final_transcript_with_correct_format(self, runner, tmp_path, sample_transcript_a, sample_transcript_b):
-        """The final transcript should have valid timestamp format."""
+        """The final transcript should have valid timestamp format (auto mode)."""
         out_dir = tmp_path / "output"
         result = runner.invoke(
             cli,
@@ -147,10 +162,8 @@ class TestComparePipeline:
                 str(sample_transcript_b),
                 "-o", str(out_dir),
             ],
-            input="a\na\n",
         )
         assert result.exit_code == 0
         final = (out_dir / "final-transcript.txt").read_text(encoding="utf-8")
-        # Verify timestamp format
         assert "[" in final and "]" in final
         assert " -> " in final

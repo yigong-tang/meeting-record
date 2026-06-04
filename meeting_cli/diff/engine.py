@@ -26,6 +26,9 @@ class DiffResult:
     end_b: float | None = None
     text_b: str = ""
     segment_index: int = 0
+    # Original segment indices for precise playback
+    seg_indices_a: list[int] = field(default_factory=list)
+    seg_indices_b: list[int] = field(default_factory=list)
 
 
 def align_segments(
@@ -87,10 +90,12 @@ def align_segments(
             start_a=start_a, end_a=end_a, text_a=text_a,
             start_b=start_b, end_b=end_b, text_b=text_b,
             segment_index=len(raw_results),
+            seg_indices_a=seg_indices_a,
+            seg_indices_b=seg_indices_b,
         ))
 
-    # 4. Merge adjacent same-level fragments to reduce noise
-    return _merge_adjacent(raw_results)
+    # 4. Merge adjacent same-level fragments, respecting time gaps
+    return _merge_adjacent(raw_results, segs_a, segs_b)
 
 
 def _build_text_and_spans(segs: list[Segment]) -> tuple[str, list[tuple[int, int]]]:
@@ -112,23 +117,25 @@ def _spans_in_range(spans: list[tuple[int, int]], start: int, end: int) -> list[
     return indices
 
 
-def _merge_adjacent(results: list[DiffResult]) -> list[DiffResult]:
-    """Merge adjacent DiffResults to produce cleaner segment-level output.
+def _merge_adjacent(
+    results: list[DiffResult],
+    segs_a: list[Segment],
+    segs_b: list[Segment],
+    max_time_gap: float = 5.0,
+) -> list[DiffResult]:
+    """Merge adjacent same-level DiffResults, but not across time gaps.
 
-    Character-level diffs alternate between tiny SAME/DIFF fragments
-    (e.g. "会"(SAME) → "议"(ORPHAN) → "今天"(SAME)).
-    We merge small alternations into larger blocks.
+    If two fragments are > max_time_gap seconds apart, they are
+    kept separate even if they have the same diff level.
     """
     if not results:
         return []
 
-    # Group into runs: merge consecutive fragments where at least
-    # one side's text is short (< 10 chars) into the surrounding context.
+    # First: merge tiny fragments (< 5 chars both sides) into next block
     merged: list[DiffResult] = []
     i = 0
     while i < len(results):
         r = results[i]
-        # If this fragment is tiny on both sides, merge with the next one
         if len(r.text_a) < 5 and len(r.text_b) < 5 and i + 1 < len(results):
             next_r = results[i + 1]
             r = DiffResult(
@@ -140,24 +147,30 @@ def _merge_adjacent(results: list[DiffResult]) -> list[DiffResult]:
                 end_b=next_r.end_b or r.end_b,
                 text_b=r.text_b + next_r.text_b,
                 segment_index=r.segment_index,
+                seg_indices_a=r.seg_indices_a + next_r.seg_indices_a,
+                seg_indices_b=r.seg_indices_b + next_r.seg_indices_b,
             )
             i += 1
-
         merged.append(r)
         i += 1
 
-    # Second pass: merge adjacent same-level fragments
+    # Second pass: merge same-level, same time-window blocks
     if not merged:
         return []
 
     final: list[DiffResult] = []
     current = merged[0]
     for next_r in merged[1:]:
-        if current.level == next_r.level:
+        if current.level == next_r.level and not _time_gap_exceeds(
+            current, next_r, segs_a, segs_b, max_time_gap
+        ):
+            # Safe to merge: same level and close enough in time
             current.text_a += next_r.text_a
             current.text_b += next_r.text_b
             current.end_a = next_r.end_a or current.end_a
             current.end_b = next_r.end_b or current.end_b
+            current.seg_indices_a += next_r.seg_indices_a
+            current.seg_indices_b += next_r.seg_indices_b
         else:
             final.append(current)
             current = next_r
@@ -168,6 +181,34 @@ def _merge_adjacent(results: list[DiffResult]) -> list[DiffResult]:
         r.segment_index = idx
 
     return final
+
+
+def _time_gap_exceeds(
+    a: DiffResult,
+    b: DiffResult,
+    segs_a: list[Segment],
+    segs_b: list[Segment],
+    threshold: float,
+) -> bool:
+    """Check if there's a large time gap between two DiffResults.
+
+    Compares the time gap between the end of `a` and start of `b`
+    on each side. If both sides have a gap > threshold, the texts
+    are likely in different parts of the recording.
+    """
+    # Check side A
+    gap_a = _compute_gap(a.end_a, b.start_a)
+    gap_b = _compute_gap(a.end_b, b.start_b)
+
+    # If BOTH sides show a large gap, keep them separate
+    return gap_a > threshold and gap_b > threshold
+
+
+def _compute_gap(end_prev: float | None, start_next: float | None) -> float:
+    """Compute time gap in seconds. Treats None as 0 (no gap detected)."""
+    if end_prev is None or start_next is None:
+        return 0.0
+    return max(0.0, start_next - end_prev)
 
 
 def _worse_level(a: DiffLevel, b: DiffLevel) -> DiffLevel:
