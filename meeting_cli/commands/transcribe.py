@@ -38,7 +38,9 @@ def parse_transcript_file(path: str) -> list[Segment]:
     """
     segments = []
     pattern = re.compile(
-        r"\[(\d{2}:\d{2}:\d{2}\.\d{3}) -> (\d{2}:\d{2}:\d{2}\.\d{3})\]\s+(.*)"
+        r"\[(\d{2}:\d{2}:\d{2}(?:\.\d{3})?)"
+        r" -> "
+        r"(\d{2}:\d{2}:\d{2}(?:\.\d{3})?)\]\s+(.*)"
     )
 
     with open(path, "r", encoding="utf-8") as f:
@@ -57,9 +59,12 @@ def parse_transcript_file(path: str) -> list[Segment]:
 
 
 def parse_timestamp(ts: str) -> float:
-    """Convert HH:MM:SS.mmm to float seconds."""
-    h, m, s = ts.split(":")
-    return int(h) * 3600 + int(m) * 60 + float(s)
+    """Convert HH:MM:SS or HH:MM:SS.mmm to float seconds."""
+    parts = ts.split(":")
+    if "." in parts[2]:
+        secs, frac = parts[2].split(".")
+        return int(parts[0]) * 3600 + int(parts[1]) * 60 + float(secs) + float(f"0.{frac}")
+    return int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
 
 
 @click.command()

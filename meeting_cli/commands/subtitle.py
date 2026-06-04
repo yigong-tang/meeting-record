@@ -57,12 +57,18 @@ def segments_to_srt(segments: list[Segment]) -> str:
     show_default=True,
     help="翻译目标语言",
 )
+@click.option(
+    "--soft",
+    is_flag=True,
+    help="软字幕（秒出，播放器可开关；默认硬字幕烧录到画面）",
+)
 def subtitle(
     transcript: str,
     video: str,
     output_dir: str,
     translate: bool,
     target_lang: str,
+    soft: bool,
 ):
     """将带时间戳的转写记录生成SRT字幕，并嵌入视频（探索性功能）。
 
@@ -100,24 +106,47 @@ def subtitle(
         return
 
     output_video = out_dir / f"{Path(video).stem}_subtitled.mp4"
-    click.echo(f"正在将字幕嵌入视频: {output_video}")
 
-    result = subprocess.run(
-        [
-            ffmpeg,
-            "-i", video,
-            "-vf", f"subtitles={srt_path}",
-            "-c:a", "copy",
-            str(output_video),
-        ],
-        check=False,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+    if soft:
+        # 软字幕：添加独立字幕轨，不重编码，秒级完成
+        click.echo(f"正在添加软字幕: {output_video}")
+        result = subprocess.run(
+            [
+                ffmpeg,
+                "-i", video,
+                "-i", str(srt_path),
+                "-c", "copy",
+                "-c:s", "mov_text",
+                "-map", "0:v:0",
+                "-map", "0:a:0",
+                "-map", "1:s:0",
+                str(output_video),
+            ],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    else:
+        # 硬字幕：烧录到画面，需重编码，慢但兼容所有播放器
+        click.echo(f"正在烧录硬字幕: {output_video} (需重编码，请耐心等待)")
+        result = subprocess.run(
+            [
+                ffmpeg,
+                "-i", video,
+                "-vf", f"subtitles={srt_path}",
+                "-c:a", "copy",
+                str(output_video),
+            ],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
     if result.returncode == 0:
         click.echo(f"带字幕视频已保存: {output_video}")
     else:
         click.echo(
-            "ffmpeg 嵌入字幕失败。请检查视频文件和 ffmpeg 安装。",
+            "ffmpeg 嵌入字幕失败。请检查视频文件和 ffmpeg 安装。\n"
+            f"  SRT 字幕已保存: {srt_path}",
             err=True,
         )
