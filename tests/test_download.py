@@ -19,15 +19,30 @@ class TestBuildYtDlpArgs:
         assert "mp3" in args
         assert "https://example.com/video" in args[-1]
 
-    def test_keep_video(self):
+    def test_keep_video_adds_keep_video_flag(self):
+        """--keep-video with audio-only should add yt-dlp's --keep-video flag."""
+        args = build_yt_dlp_args(
+            url="https://example.com/video",
+            output_dir="/tmp/out",
+            audio_only=True,
+            keep_video=True,
+        )
+        assert "--keep-video" in args
+        assert "-x" in args
+        assert "--audio-format" in args
+
+    def test_no_audio_no_video_flags(self):
+        """--no-audio-only: download original format directly."""
         args = build_yt_dlp_args(
             url="https://example.com/video",
             output_dir="/tmp/out",
             audio_only=False,
-            keep_video=True,
+            keep_video=False,
         )
         assert "-x" not in args
         assert "--audio-format" not in args
+        assert "--keep-video" not in args
+        assert "https://example.com/video" in args[-1]
 
     def test_output_template(self):
         args = build_yt_dlp_args(

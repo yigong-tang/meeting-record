@@ -26,6 +26,19 @@ def _check_ffmpeg():
         )
 
 
+def _cleanup_streams(output_dir: str):
+    """Remove intermediate stream files left by yt-dlp.
+
+    yt-dlp downloads separate audio/video streams then merges them.
+    With --keep-video, these intermediate .f*.mp4 / .f*.m4a files
+    are preserved alongside the final merged output. Clean them up.
+    """
+    out = Path(output_dir)
+    for pattern in ["*.f*.mp4", "*.f*.m4a"]:
+        for f in out.glob(pattern):
+            f.unlink()
+
+
 def build_yt_dlp_args(
     url: str,
     output_dir: str,
@@ -59,7 +72,9 @@ def build_yt_dlp_args(
 
     if audio_only:
         args.extend(["-x", "--audio-format", "mp3"])
-        if not keep_video:
+        if keep_video:
+            args.append("--keep-video")  # 提取音频后保留合并后的视频
+        else:
             args.append("--audio-quality")
             args.append("0")
 
@@ -143,6 +158,7 @@ def download(
                 err=True,
             )
             sys.exit(result.returncode)
+        _cleanup_streams(output_dir)
         click.echo(f"下载完成，文件保存在: {output_dir}")
     except FileNotFoundError:
         click.echo(
